@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlin-kapt'
 }
 
 android {
@@ -46,7 +47,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
     //Libreria de Bluetooth BLE
     implementation "com.polidea.rxandroidble3:rxandroidble:1.17.2"
-    //Libreria Adicional bluetooth
+    //Libreria Adicional bluetooth (Sin usar)
     implementation 'no.nordicsemi.android:ble-ktx:2.6.0'
     implementation 'no.nordicsemi.android:ble-livedata:2.6.0'
 
@@ -61,4 +62,11 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1"
     // LiveData
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.5.1"
+    //Room
+    implementation "androidx.room:room-ktx:2.5.0"
+    kapt "androidx.room:room-compiler:2.5.0"
+    //Mapa
+    implementation 'com.google.android.gms:play-services-maps:18.1.0'
+    //WorkManager
+    implementation "androidx.work:work-runtime-ktx:2.7.1"
 }

@@ -1,4 +1,4 @@
-package com.example.skytah2.ui.viewmodel
+package com.example.skytah2.ui.data.network.viewmodel
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel

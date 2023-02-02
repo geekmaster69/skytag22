@@ -2,43 +2,47 @@ package com.example.skytah2
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
 import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkInfo
+import android.os.BatteryManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.IBinder
-import android.telephony.SmsManager
-import android.util.Log
 import android.widget.Toast
-import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.getSystemService
+import androidx.work.*
 import com.example.skytah2.databinding.ActivityMainBinding
-import com.example.skytah2.ui.data.network.model.InfoSOS
-import com.example.skytah2.ui.viewmodel.SendInfoViewModel
+import com.example.skytah2.workers.WorkerLocation
 import com.polidea.rxandroidble3.RxBleDevice
-import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
+
 @SuppressLint("MissingPermission")
+private const val ENABLE_BLUETOOTH_REQUEST = 1
+private const val REQUEST_ALL_PERMISSIONS = 1001
 class MainActivity : AppCompatActivity(), BLEView {
-    private lateinit var dateFormat: SimpleDateFormat
     private var bleService: BLEService? = null
     private var bleServiceBound = false
-    private val sendInfoViewModel: SendInfoViewModel by viewModels()
-
+    private val bluetoothAdapter: BluetoothAdapter by lazy {
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager.adapter
+    }
     //connect to the service
     private val bleServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as? BLEService.ServiceBinder
-
             bleService = binder?.service
             bleService?.bindView(this@MainActivity)
             bleServiceBound = true
@@ -56,13 +60,17 @@ class MainActivity : AppCompatActivity(), BLEView {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
         locManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
         binding.btnConectar.setOnClickListener {
-            Intent(applicationContext, BLEService::class.java).apply {
-                action = BLEService.ACTION_START
-                startService(this)
-            }
+
+        }
+
+        binding.btnStarGPS.setOnClickListener {
+         myPeriodicWork()
+
         }
 
         binding.btnDesconectar.setOnClickListener {
@@ -72,19 +80,68 @@ class MainActivity : AppCompatActivity(), BLEView {
             }
         }
 
+        getBatteryPercentage()
+    }
+
+    private fun myPeriodicWork() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .setRequiresCharging(true)
+            .build()
+
+        val myWorkRequest = PeriodicWorkRequest.Builder(
+            WorkerLocation::class.java,
+            15,
+            TimeUnit.MINUTES
+        ).setConstraints(constraints)
+            .addTag("my_id")
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork("my_id", ExistingPeriodicWorkPolicy.REPLACE, myWorkRequest)
+
+
+    }
+
+
+    private fun getBatteryPercentage() {
+        val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { intentFilter ->
+            this.registerReceiver(null, intentFilter)
+        }
+        val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val batteryPct = level/scale.toFloat()
+        binding.tvBatteryLevel.text = "%" + (batteryPct*100).toString()
+
+
     }
 
     override fun onResume() {
         super.onResume()
 
         if (checkAllRequiredPermissions()) {
-            if (!bleServiceBound) {
-                val bleServiceIntent = Intent(applicationContext, BLEService::class.java)
-                applicationContext.bindService(bleServiceIntent, bleServiceConnection, Context.BIND_AUTO_CREATE)
-                applicationContext.startService(bleServiceIntent)
+            if (!bluetoothAdapter.isEnabled){
+                activateCommunications()
+                if (!bleServiceBound) {
+                    val bleServiceIntent = Intent(applicationContext, BLEService::class.java)
+                    applicationContext.bindService(bleServiceIntent, bleServiceConnection, Context.BIND_AUTO_CREATE)
+                    applicationContext.startService(bleServiceIntent)
+                }
             }
         }
     }
+
+
+    @SuppressLint("MissingPermission")
+    private fun activateCommunications() {
+        val connMgr = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo: NetworkInfo? = connMgr.activeNetworkInfo
+
+        if (!bluetoothAdapter.isEnabled){
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            startActivityForResult(enableBtIntent, ENABLE_BLUETOOTH_REQUEST)
+        }
+    }
+
     private fun checkAllRequiredPermissions(): Boolean {
 
         val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -93,12 +150,14 @@ class MainActivity : AppCompatActivity(), BLEView {
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.SEND_SMS,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+
             )
         } else {
             arrayOf(
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION,
-
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                 Manifest.permission.SEND_SMS)
         }
 
@@ -124,7 +183,6 @@ class MainActivity : AppCompatActivity(), BLEView {
             for (grantResult in grantResults) {
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
                 } else {
-
                     Toast.makeText(this, "Se requieren todos los permisos", Toast.LENGTH_LONG).show()
                     finish()
                 }
@@ -153,16 +211,19 @@ class MainActivity : AppCompatActivity(), BLEView {
             action = BLEService.ACTION_STOP
             startService(this)
         }
-
-
     }
-
-
 
     override fun onError(throwable: Throwable) {
-
     }
-    companion object {
-        private const val REQUEST_ALL_PERMISSIONS = 1001
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when(requestCode){
+            ENABLE_BLUETOOTH_REQUEST ->{
+                if (resultCode != Activity.RESULT_OK){
+                    activateCommunications()
+                }
+            }
+        }
     }
 }
