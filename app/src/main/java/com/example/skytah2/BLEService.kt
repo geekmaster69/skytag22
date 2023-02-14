@@ -69,6 +69,16 @@ class BLEService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "Service onStartCommand")
 
+        when(intent?.action){
+          //  ACTION_START -> starLocation()
+          //  ACTION_STOP  -> stop()
+            ACTION_START_SCAN -> scan()
+        }
+        return START_STICKY
+    }
+
+    private fun starLocation() {
+
         val notification = NotificationCompat.Builder(this, "location")
             .setContentTitle("Rastreando")
             .setContentText("Ubicacion: Buscando...")
@@ -84,17 +94,17 @@ class BLEService : Service() {
                 lat = location.latitude.toString()
                 long = location.longitude.toString()
 
-//                val smsManager = SmsManager.getDefault()
-//                val phoneNumber = "5519487452"
-//                val message = "Latitud:$lat \n Longitud: $long"
-//                smsManager.sendTextMessage(phoneNumber, null, message, null, null)
+                val smsManager = SmsManager.getDefault()
+                val phoneNumber = "5519487452"
+                val message = "Latitud:$lat \n Longitud: $long"
+                smsManager.sendTextMessage(phoneNumber, null, message, null, null)
                 Log.i("sendSMS", "SMS enviado")
 
 
                 val mensaje = "reporte"
                 val usuario = "tagkeyuser"
                 val telefono = "5611750632"
-                // val tagKey = deviceMac ?: "No Disponible"
+                val tagKey = deviceMac ?: "No Disponible"
                 val codigo = "1"
                 val datail = "reporte de tag"
                 val date = Date()
@@ -102,9 +112,9 @@ class BLEService : Service() {
                 val latitud = lat
                 val longitud = long
 
-                //  val response =  sendInfoUseCase(InfoSOS(mensaje, usuario, telefono, tagKey, codigo, datail, fecha, latitud.toDouble(), longitud.toDouble()))
+                val response =  sendInfoUseCase(InfoSOS(mensaje, usuario, telefono, tagKey, codigo, datail, fecha, latitud.toDouble(), longitud.toDouble()))
 
-                //  Log.i("Responce", response.toString())
+                Log.i("Responce", response.toString())
 
                 Log.i("Fecha", "$fecha  $latitud  $longitud")
 
@@ -116,12 +126,7 @@ class BLEService : Service() {
             .launchIn(servicesScope)
         startForeground(1, notification.build())
 
-//        when(intent?.action){
-//            ACTION_START -> starLocation()
-//            ACTION_STOP  -> stop()
-//            ACTION_START_SCAN -> scan()
-//        }
-        return START_STICKY
+
     }
 
 
@@ -171,6 +176,7 @@ class BLEService : Service() {
 
     private fun pressKey() {
         view?.onKeyPressed()
+        starLocation()
 
     }
 

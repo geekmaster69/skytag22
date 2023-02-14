@@ -24,7 +24,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.work.*
 import com.example.skytah2.databinding.ActivityMainBinding
-import com.example.skytah2.workers.WorkerLocation
+import com.example.skytah2.workers.UploadInformation
 import com.polidea.rxandroidble3.RxBleDevice
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -65,12 +65,15 @@ class MainActivity : AppCompatActivity(), BLEView {
         locManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
         binding.btnConectar.setOnClickListener {
+            Intent(applicationContext, BLEService::class.java).apply {
+                action = BLEService.ACTION_START_SCAN
+                startService(this)
+            }
 
         }
 
         binding.btnStarGPS.setOnClickListener {
          myPeriodicWork()
-
         }
 
         binding.btnDesconectar.setOnClickListener {
@@ -90,7 +93,7 @@ class MainActivity : AppCompatActivity(), BLEView {
             .build()
 
         val myWorkRequest = PeriodicWorkRequest.Builder(
-            WorkerLocation::class.java,
+            UploadInformation::class.java,
             15,
             TimeUnit.MINUTES
         ).setConstraints(constraints)
@@ -98,7 +101,6 @@ class MainActivity : AppCompatActivity(), BLEView {
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork("my_id", ExistingPeriodicWorkPolicy.REPLACE, myWorkRequest)
-
 
     }
 
@@ -110,7 +112,7 @@ class MainActivity : AppCompatActivity(), BLEView {
         val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val batteryPct = level/scale.toFloat()
-        binding.tvBatteryLevel.text = "%" + (batteryPct*100).toString()
+
 
 
     }
@@ -149,15 +151,13 @@ class MainActivity : AppCompatActivity(), BLEView {
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                 Manifest.permission.SEND_SMS,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
-
             )
         } else {
             arrayOf(
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                 Manifest.permission.SEND_SMS)
         }
 
